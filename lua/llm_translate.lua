@@ -10,6 +10,7 @@ M.config = {
   float_position = "cursor",
   float_offset = { row = 1, col = 0 },
   float_width = { min = 40, max = 120, ratio = 0.85, padding = 6 },
+  float_wrap = true,
 }
 
 function M.setup(opts)
@@ -78,6 +79,20 @@ local function max_display_width(lines)
   return maxw
 end
 
+local function estimate_display_lines(lines, width)
+  local w = math.max(1, (tonumber(width) or 1) - 1)
+  local total = 0
+  for _, line in ipairs(lines or {}) do
+    if type(line) ~= "string" or line == "" then
+      total = total + 1
+    else
+      local lw = vim.fn.strdisplaywidth(line)
+      total = total + math.max(1, math.ceil(lw / w))
+    end
+  end
+  return total
+end
+
 local function float_dims(lines)
   local columns = vim.o.columns
   local lines_total = vim.o.lines
@@ -96,7 +111,9 @@ local function float_dims(lines)
 
   local max_height = math.floor((lines_total - 4) * 0.85)
   if max_height < 6 then max_height = 6 end
-  local height = math.min(math.max(#(lines or {}) + 2, 6), max_height)
+  local line_count = #(lines or {})
+  if M.config.float_wrap then line_count = estimate_display_lines(lines, width) end
+  local height = math.min(math.max(line_count + 2, 6), max_height)
   return width, height
 end
 
@@ -195,6 +212,13 @@ local function open_float(title, lines)
     title = title,
     title_pos = "center",
   })
+
+  vim.wo[win].wrap = not not M.config.float_wrap
+  vim.wo[win].linebreak = true
+  vim.wo[win].breakindent = true
+  vim.wo[win].number = false
+  vim.wo[win].relativenumber = false
+  vim.wo[win].signcolumn = "no"
 
   M._float.win_by_buf[buf] = win
   M._float.meta_by_buf[buf] = meta
